@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #030014;
+  --foreground: #ffffff;
+
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.1);
+
+  --primary: #00f0ff;
+  --primary-glow: rgba(0, 240, 255, 0.5);
+
+  --secondary: #7000ff;
+  --secondary-glow: rgba(112, 0, 255, 0.5);
+
+  --accent: #ff0055;
+
+  --font-orbitron: 'Orbitron', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+}
+
+body {
+  color: var(--foreground);
+  background: transparent;
+  font-family: var(--font-orbitron);
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+a,
+button,
+input,
+label,
+li {
+  font-family: var(--font-orbitron);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Utilities */
+.glass-panel {
+  background: rgba(10, 10, 30, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.neon-text {
+  text-shadow: 0 0 10px var(--primary-glow), 0 0 20px var(--primary-glow);
+}
+
+.neon-border {
+  box-shadow: 0 0 10px var(--primary-glow), inset 0 0 10px var(--primary-glow);
+  border: 1px solid var(--primary);
+}
+
+/* Animations */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float 10s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 5px var(--primary-glow);
+  }
+
+  50% {
+    box-shadow: 0 0 20px var(--primary-glow), 0 0 10px var(--primary);
+  }
+
+  100% {
+    box-shadow: 0 0 5px var(--primary-glow);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s infinite;
+}
+
+@keyframes twinkle {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  animation: twinkle var(--duration, 3s) infinite ease-in-out;
+}
+
+/* Intro Video Animations */
+.video-fade-out {
+  opacity: 0;
+  transition: opacity 1.5s ease-out;
+  pointer-events: none;
+}
+
+.landing-fade-in {
+  animation: fadeInLanding 1.5s ease-in forwards;
+}
+
+@keyframes fadeInLanding {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Hide Next.js Dev Overlay */
+.nextjs-toast,
+#__next-build-watcher,
+#__next-route-announcer,
+#__next-dev-overlay {
+  display: none !important;
+}

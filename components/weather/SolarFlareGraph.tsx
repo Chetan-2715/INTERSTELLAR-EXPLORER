@@ -1,0 +1,46 @@
+import React from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Card } from "@/components/ui/Card";
+
+interface FlareData {
+    time: number;
+    flux: number;
+}
+
+export const SolarFlareGraph = ({ data }: { data: FlareData[] }) => {
+    return (
+        <Card glow className="p-4 h-[300px] flex flex-col bg-black/40 border-cyan-500/30">
+            <h3 className="text-lg font-orbitron text-yellow-300 mb-4">X-RAY FLUX (WATTS/M²)</h3>
+            <div className="flex-1 w-full min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                        <XAxis
+                            dataKey="time"
+                            stroke="rgba(255,255,255,0.5)"
+                            tick={{ fontSize: 12 }}
+                            interval="preserveStartEnd"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            tickFormatter={(unixTime) => new Date(unixTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        />
+                        <YAxis
+                            stroke="rgba(255,255,255,0.5)"
+                            tick={{ fontSize: 12 }}
+                            scale="log"
+                            domain={['auto', 'auto']}
+                            tickFormatter={(value) => Number(value).toExponential(0)}
+                        />
+                        <Tooltip
+                            contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid rgba(6,182,212,0.3)', borderRadius: '8px', color: '#fff' }}
+                            itemStyle={{ color: '#fbbf24' }}
+                            formatter={(value: number) => [value.toExponential(2), "Flux"]}
+                            labelFormatter={(label) => new Date(label).toLocaleString()}
+                        />
+                        <Line type="monotone" dataKey="flux" stroke="#fbbf24" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#fff' }} animationDuration={500} />
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+        </Card>
+    );
+};

@@ -1,4 +1,4 @@
-import { Scan, Activity, Bot, BrainCircuit, Disc, Sparkles, Globe } from "lucide-react";
+import { Scan, Activity, Bot, BrainCircuit, Play, Globe } from "lucide-react";
 
 export const APP_ROUTES = [
     {
@@ -26,16 +26,10 @@ export const APP_ROUTES = [
         description: "Test your cosmic knowledge with dynamic AI-generated quizzes from easy level to real astronaut mode."
     },
     {
-        title: "Black Hole Simulator",
-        path: "/dashboard/blackhole",
-        icon: Disc,
-        description: "Explore gravitational lensing, accretion discs, and time dilation effects with an interactive black hole simulation."
-    },
-    {
-        title: "Galaxy Generator",
-        path: "/dashboard/galaxy",
-        icon: Sparkles,
-        description: "Generate procedural galaxies and nebulae using AI-driven spatial noise models and space aesthetics."
+        title: "Black Hole Effect",
+        path: "/dashboard/blackhole-effect",
+        icon: Play,
+        description: "Experience a cinematic visualization of a black hole with gravitational lensing and accretion disk effects."
     },
     {
         title: "Satellite Map",

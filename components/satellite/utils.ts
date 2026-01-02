@@ -1,110 +1,123 @@
 import { Satellite } from "@/components/satellite/types";
 import * as satellite from "satellite.js";
 
-// TLE Data Sources (Celestrak)
-const TLE_SOURCES = {
-    STARLINK: "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
-    GPS: "https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle",
-    ISS: "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=tle",
-    WEATHER: "https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=tle",
-    ALL: "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle", // Note: This is large
+const GP_URL_BASE = "/api/satellites";
+
+const CATEGORY_GROUPS: Record<string, string> = {
+    STARLINK: "starlink",
+    GPS: "gps",
+    ISS: "stations",
+    WEATHER: "weather"
 };
 
-export async function fetchSatellites(category: string = "STARLINK"): Promise<Satellite[]> {
+// Retry configuration
+const MAX_RETRIES = 3;
+const TIMEOUT_MS = 6000;
+
+async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<any> {
     try {
-        let tleUrl = TLE_SOURCES.STARLINK;
-        let satCatUrl = "https://celestrak.org/satcat/records.php?GROUP=starlink&FORMAT=json";
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-        if (category === "GPS") {
-            tleUrl = TLE_SOURCES.GPS;
-            satCatUrl = "https://celestrak.org/satcat/records.php?GROUP=gps-ops&FORMAT=json";
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(id);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        if (category === "ISS") {
-            tleUrl = TLE_SOURCES.ISS;
-            satCatUrl = "https://celestrak.org/satcat/records.php?CATNR=25544&FORMAT=json";
+        return await response.json();
+    } catch (error) {
+        if (retries > 0) {
+            const delay = Math.pow(2, MAX_RETRIES - retries) * 1000; // Exponential backoff
+            console.warn(`Fetch failed, retrying in ${delay}ms... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchWithRetry(url, retries - 1);
         }
-        if (category === "WEATHER") {
-            tleUrl = TLE_SOURCES.WEATHER;
-            satCatUrl = "https://celestrak.org/satcat/records.php?GROUP=weather&FORMAT=json";
-        }
+        throw error;
+    }
+}
 
-        const [tleResponse, satCatResponse] = await Promise.all([
-            fetch(tleUrl),
-            fetch(satCatUrl)
-        ]);
+export async function fetchSatellites(category: string = "STARLINK"): Promise<Satellite[]> {
+    const group = CATEGORY_GROUPS[category] || "starlink";
+    const url = `${GP_URL_BASE}?group=${group}&format=json`;
 
-        if (!tleResponse.ok) throw new Error("Failed to fetch TLE data");
-        const tleText = await tleResponse.text();
-
-        let satCatData: any[] = [];
-        if (satCatResponse.ok) {
-            try {
-                satCatData = await satCatResponse.json();
-            } catch (e) {
-                console.warn("Failed to parse SatCat JSON", e);
-            }
-        }
-
-        return parseTLE(tleText, category, satCatData);
+    try {
+        const data = await fetchWithRetry(url);
+        return parseGPData(data, category);
     } catch (error) {
         console.error("Error fetching satellite data:", error);
         return [];
     }
 }
 
-function parseTLE(tleData: string, category: string, satCatData: any[]): Satellite[] {
-    const lines = tleData.split('\n');
+function parseGPData(data: any[], category: string): Satellite[] {
+    if (!Array.isArray(data)) return [];
+
     const satellites: Satellite[] = [];
 
-    // Create a map for fast lookup of SatCat data by NORAD ID
-    const satCatMap = new Map<number, any>();
-    satCatData.forEach(item => {
-        if (item.NORAD_CAT_ID) {
-            satCatMap.set(item.NORAD_CAT_ID, item);
-        }
-    });
+    data.forEach((item, index) => {
+        try {
+            const line1 = item.TLE_LINE1;
+            const line2 = item.TLE_LINE2;
+            const name = item.OBJECT_NAME;
 
-    for (let i = 0; i < lines.length; i += 3) {
-        const nameLine = lines[i]?.trim();
-        const line1 = lines[i + 1]?.trim();
-        const line2 = lines[i + 2]?.trim();
-
-        if (nameLine && line1 && line2) {
-            try {
+            if (line1 && line2 && name) {
                 const satrec = satellite.twoline2satrec(line1, line2);
 
-                // Extract NORAD ID from Line 1 (cols 3-7, 0-indexed: 2-7)
-                // Actually standard TLE format:
-                // Line 1, Col 3-7 is Satellite Number
-                const noradIdStr = line1.substring(2, 7).trim();
-                const noradId = parseInt(noradIdStr, 10);
+                // Extract metadata from GP JSON or fallback to TLE parsing
+                const noradId = item.NORAD_CAT_ID || parseInt(line1.substring(2, 7).trim(), 10);
+                const intlDes = item.OBJECT_ID || line1.substring(9, 17).trim();
 
-                // Extract Int'l Designator from Line 1 (cols 10-17)
-                const intlDes = line1.substring(9, 17).trim();
+                // Infer some metadata if not present (GP data is limited in metadata compared to SatCat)
+                // We can map known constellations to countries/operators
+                let country = "Unknown";
+                let operator = "Unknown";
+                let site = "Unknown";
 
-                // Lookup metadata
-                const metadata = satCatMap.get(noradId);
+                if (category === "STARLINK") {
+                    country = "USA";
+                    operator = "SpaceX";
+                    site = "CCAFS"; // Common for Starlink
+                } else if (category === "GPS") {
+                    country = "USA";
+                    operator = "US Space Force";
+                } else if (category === "ISS") {
+                    country = "Multinational";
+                    operator = "NASA/ESA/Roscosmos/JAXA/CSA";
+                } else if (category === "WEATHER") {
+                    // Heuristic based on name
+                    if (name.includes("NOAA") || name.includes("GOES")) {
+                        country = "USA";
+                        operator = "NOAA";
+                    } else if (name.includes("METEOR")) {
+                        country = "Russia";
+                    } else if (name.includes("METEOSAT")) {
+                        country = "Europe";
+                        operator = "EUMETSAT";
+                    }
+                }
 
                 satellites.push({
-                    id: i,
-                    name: nameLine,
+                    id: index,
+                    name: name,
                     line1: line1,
                     line2: line2,
                     satrec: satrec,
                     category: category,
                     noradId: noradId,
                     intlDes: intlDes,
-                    launchDate: metadata?.LAUNCH_DATE || "Unknown",
-                    site: metadata?.LAUNCH_SITE || "Unknown",
-                    country: metadata?.OWNER || "Unknown",
-                    launchYear: metadata?.LAUNCH_DATE ? metadata.LAUNCH_DATE.substring(0, 4) : (intlDes ? "20" + intlDes.substring(0, 2) : "Unknown"), // Fallback to Int'l Des year
-                    objectType: metadata?.OBJECT_TYPE || "Unknown"
+                    launchDate: item.EPOCH ? item.EPOCH.substring(0, 10) : "Unknown", // Using Epoch as proxy if Launch Date unavailable
+                    site: site,
+                    country: country,
+                    launchYear: intlDes.startsWith("19") || intlDes.startsWith("20") ? intlDes.substring(0, 4) : "Unknown",
+                    objectType: item.OBJECT_TYPE || "PAYLOAD"
                 });
-            } catch (e) {
-                // Skip invalid TLEs
             }
+        } catch (e) {
+            // Skip invalid items
         }
-    }
+    });
+
     return satellites;
 }
 

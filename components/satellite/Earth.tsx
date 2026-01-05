@@ -1,46 +1,52 @@
 "use client";
 
 import React, { useRef } from "react";
-import { useLoader, useFrame } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { TextureLoader } from "three";
 
 export function Earth() {
     const earthRef = useRef<THREE.Mesh>(null);
-    const cloudsRef = useRef<THREE.Mesh>(null);
+    const atmosRef = useRef<THREE.Mesh>(null);
 
-    // Load textures (using placeholder URLs or local assets if available)
-    // For now, we'll use a procedural material or standard colors if textures fail
-    // In a real app, you'd download high-res earth textures to /public/textures/
-
-    useFrame(() => {
+    useFrame(({ clock }) => {
+        const t = clock.getElapsedTime();
         if (earthRef.current) {
-            earthRef.current.rotation.y += 0.0005;
+            earthRef.current.rotation.y = t * 0.05;
         }
-        if (cloudsRef.current) {
-            cloudsRef.current.rotation.y += 0.0007;
+        if (atmosRef.current) {
+            atmosRef.current.rotation.y = t * 0.07;
         }
     });
 
     return (
         <group>
-            {/* Earth Sphere */}
+            {/* Base Core (Dark Ocean) */}
             <mesh ref={earthRef}>
                 <sphereGeometry args={[1, 64, 64]} />
                 <meshPhongMaterial
-                    color="#1a2b4b"
+                    color="#001133"
                     emissive="#000000"
-                    specular="#111111"
-                    shininess={10}
-                    map={null} // Add texture map here
+                    specular="#0044ff"
+                    shininess={40}
+                />
+            </mesh>
+
+            {/* Sci-Fi Grid Overlay */}
+            <mesh scale={[1.005, 1.005, 1.005]}>
+                <sphereGeometry args={[1, 32, 32]} />
+                <meshBasicMaterial
+                    color="#0088ff"
+                    wireframe
+                    transparent
+                    opacity={0.15}
                 />
             </mesh>
 
             {/* Atmosphere Glow */}
-            <mesh scale={[1.02, 1.02, 1.02]}>
+            <mesh ref={atmosRef} scale={[1.1, 1.1, 1.1]}>
                 <sphereGeometry args={[1, 64, 64]} />
                 <meshBasicMaterial
-                    color="#4b96f3"
+                    color="#00aaff"
                     transparent
                     opacity={0.1}
                     side={THREE.BackSide}
@@ -48,15 +54,10 @@ export function Earth() {
                 />
             </mesh>
 
-            {/* Wireframe Grid for Sci-Fi Look */}
-            <mesh scale={[1.001, 1.001, 1.001]}>
-                <sphereGeometry args={[1, 24, 24]} />
-                <meshBasicMaterial
-                    color="#00ffff"
-                    wireframe
-                    transparent
-                    opacity={0.05}
-                />
+            {/* Equator Ring */}
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[1.2, 0.005, 16, 100]} />
+                <meshBasicMaterial color="#00ffff" transparent opacity={0.3} />
             </mesh>
         </group>
     );

@@ -6,88 +6,53 @@ import { cleanText } from "@/lib/utils";
 export async function POST(req: NextRequest) {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            console.error("Chat API: GEMINI_API_KEY is missing.");
-            return NextResponse.json({
-                error: "Configuration Error",
-                details: "API Key is missing on server."
-            }, { status: 500 });
-        }
+        if (!apiKey) return NextResponse.json({ error: "Configuration Error" }, { status: 500 });
 
         const { message, history } = await req.json();
 
-        if (!message) {
-            return NextResponse.json({ error: "Message is required" }, { status: 400 });
-        }
+        // 1. DEFINE THE PERSONA
+        // This tells the AI exactly how to behave.
+        const systemInstruction = `
+            You are "Astra", the onboard AI Computer for the Interstellar Explorer vessel.
+            Your mission is to assist the Commander (the user) with space knowledge, mission planning, and scientific analysis.
+            
+            Tone: Professional, calm, slightly robotic but helpful (like HAL 9000 but friendly, or JARVIS).
+            - Use scientific terms but explain them simply if asked.
+            - If the user is confused, offer analogies.
+            - Keep answers concise unless asked for a detailed report.
+            - Use formatting (bullet points, bold text) to make data scannable.
+            
+            Never mention you are an AI model by Google. You are a ship system.
+        `;
 
-        console.log("Chat API: Received message:", message);
-        console.log("Chat API: History length:", history?.length || 0);
-        if (history?.length > 0) {
-            console.log("Chat API: First history item:", JSON.stringify(history[0]));
-            console.log("Chat API: Last history item:", JSON.stringify(history[history.length - 1]));
-        }
-
-        // Use gemini-2.0-flash as a stable alternative
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
-            safetySettings: [
-                {
-                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-            ],
+            model: "gemini-3-flash-preview",
+            // Inject the persona here
+            systemInstruction: systemInstruction,
         });
 
         const chat = model.startChat({
             history: history || [],
             generationConfig: {
-                maxOutputTokens: 500,
+                maxOutputTokens: 1500, // INCREASED from 500
+                temperature: 0.7,      // Slight creativity
             },
         });
 
         const result = await chat.sendMessage(message);
         const response = await result.response;
 
-        let text = "";
-        try {
-            text = response.text();
-        } catch (e) {
-            console.error("Chat API: Error getting text from response. Candidate might be blocked.");
-        }
+        let text = response.text();
+        if (!text) throw new Error("Empty response");
 
-        if (!text) {
-            console.error("Chat API: Empty response generated.");
-            return NextResponse.json({
-                error: "No response generated.",
-                details: "The model returned an empty response. It might have been blocked by safety filters."
-            }, { status: 500 });
-        }
-
-        // Clean Markdown formatting
-        text = cleanText(text);
-
-        console.log("Chat API: Response generated. Length:", text.length);
+        // Optional: We don't strictly need cleanText if we want Markdown, 
+        // but keeping it simple for now.
+        // text = cleanText(text); 
 
         return NextResponse.json({ reply: text });
+
     } catch (error: any) {
         console.error("Chat API Error:", error);
-        // Ensure error object is serializable
-        const errorMessage = error.message || "Unknown error";
-        return NextResponse.json({
-            error: "Communication breakdown.",
-            details: errorMessage
-        }, { status: 500 });
+        return NextResponse.json({ error: "System Malfunction", details: error.message }, { status: 500 });
     }
 }

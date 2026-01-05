@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: {
-    buildActivity: false,
-    appIsrStatus: false,
+    appIsrStatus: false, // This hides the static/dynamic "N" indicator
+    buildActivity: false, // This hides the spinning compilation icon
   } as any,
 };
 

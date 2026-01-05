@@ -4,36 +4,58 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
-        // Fetch Kp Index (Geomagnetic Storm Level)
-        const kpRes = await fetch("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json", { cache: 'no-store' });
-        const kpData = await kpRes.json();
-        // kpData is array of arrays. Last one is latest. [time, kp, a_running, station_count]
-        const latestKp = kpData[kpData.length - 1];
+        // 1. Fetch Raw Data concurrently
+        const [kpRes, windRes, xRayRes] = await Promise.all([
+            fetch("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json", { next: { revalidate: 300 } }),
+            fetch("https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json", { next: { revalidate: 60 } }),
+            fetch("https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json", { next: { revalidate: 60 } })
+        ]);
 
-        // Fetch Solar Wind (Mag)
-        // https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json
-        // [time_tag, bt, bx, by, bz, phi, theta]
-        const windRes = await fetch("https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json", { cache: 'no-store' });
-        const windData = await windRes.json();
-        const latestWind = windData[windData.length - 1];
+        const kpJson = await kpRes.json();     // [time, kp, a_running, station_count]
+        const windJson = await windRes.json(); // [time_tag, bt, bx, by, bz, phi, theta]
+        const xRayJson = await xRayRes.json(); // [{ time_tag, flux, energy }, ...]
 
-        // Fetch Solar Flare (using NASA DONKI if available, or mock/other source. NOAA has x-ray flux)
-        // https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json
-        const xRayRes = await fetch("https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json", { cache: 'no-store' });
-        const xRayData = await xRayRes.json();
-        const latestXRay = xRayData[xRayData.length - 1]; // { time_tag, flux, energy }
+        // 2. Process History (Skip header row for Arrays)
+        // KP: Get last 24 entries (approx 3 days, but usually we just want the recent set)
+        const kpHistory = kpJson.slice(1).slice(-24).map((row: any[]) => ({
+            time: new Date(row[0]).getTime(),
+            kp: Number(row[1])
+        }));
+
+        // WIND: Get last ~100 points (approx 8 hours) to keep graph readable
+        const windHistory = windJson.slice(1).slice(-100).map((row: any[]) => ({
+            time: new Date(row[0]).getTime(),
+            bt: Number(row[1]),
+            bz: Number(row[4])
+        }));
+
+        // FLARE: JSON objects, not array of arrays. Already has keys.
+        const flareHistory = xRayJson.slice(-100).map((item: any) => ({
+            time: new Date(item.time_tag).getTime(),
+            flux: item.flux
+        }));
+
+        // 3. Extract Latest Data
+        const latestKp = kpHistory[kpHistory.length - 1] || { kp: 0 };
+        const latestWind = windHistory[windHistory.length - 1] || { bt: 0, bz: 0 };
+        const latestFlare = flareHistory[flareHistory.length - 1] || { flux: 0 };
 
         return NextResponse.json({
-            kpIndex: latestKp[1],
-            solarWind: {
-                bt: latestWind[1], // Total Field
-                bz: latestWind[4], // North-South component (important for storms)
+            current: {
+                kpIndex: latestKp.kp,
+                solarWind: { bt: latestWind.bt, bz: latestWind.bz },
+                solarFlare: {
+                    flux: latestFlare.flux,
+                    class: calculateFlareClass(latestFlare.flux)
+                }
             },
-            solarFlare: {
-                flux: latestXRay.flux,
-                class: calculateFlareClass(latestXRay.flux)
+            history: {
+                kp: kpHistory,
+                wind: windHistory,
+                flare: flareHistory
             }
         });
+
     } catch (error) {
         console.error("Weather API Error:", error);
         return NextResponse.json({ error: "Failed to fetch space weather" }, { status: 500 });

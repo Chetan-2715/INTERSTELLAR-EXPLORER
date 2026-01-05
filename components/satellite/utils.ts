@@ -5,7 +5,7 @@ const GP_URL_BASE = "/api/satellites";
 
 const CATEGORY_GROUPS: Record<string, string> = {
     STARLINK: "starlink",
-    GPS: "gps",
+    GPS: "gps-ops",
     ISS: "stations",
     WEATHER: "weather"
 };
@@ -69,7 +69,6 @@ function parseGPData(data: any[], category: string): Satellite[] {
                 const intlDes = item.OBJECT_ID || line1.substring(9, 17).trim();
 
                 // Infer some metadata if not present (GP data is limited in metadata compared to SatCat)
-                // We can map known constellations to countries/operators
                 let country = "Unknown";
                 let operator = "Unknown";
                 let site = "Unknown";
@@ -77,7 +76,7 @@ function parseGPData(data: any[], category: string): Satellite[] {
                 if (category === "STARLINK") {
                     country = "USA";
                     operator = "SpaceX";
-                    site = "CCAFS"; // Common for Starlink
+                    site = "CCAFS";
                 } else if (category === "GPS") {
                     country = "USA";
                     operator = "US Space Force";
@@ -85,7 +84,6 @@ function parseGPData(data: any[], category: string): Satellite[] {
                     country = "Multinational";
                     operator = "NASA/ESA/Roscosmos/JAXA/CSA";
                 } else if (category === "WEATHER") {
-                    // Heuristic based on name
                     if (name.includes("NOAA") || name.includes("GOES")) {
                         country = "USA";
                         operator = "NOAA";
@@ -106,7 +104,7 @@ function parseGPData(data: any[], category: string): Satellite[] {
                     category: category,
                     noradId: noradId,
                     intlDes: intlDes,
-                    launchDate: item.EPOCH ? item.EPOCH.substring(0, 10) : "Unknown", // Using Epoch as proxy if Launch Date unavailable
+                    launchDate: item.EPOCH ? item.EPOCH.substring(0, 10) : "Unknown",
                     site: site,
                     country: country,
                     launchYear: intlDes.startsWith("19") || intlDes.startsWith("20") ? intlDes.substring(0, 4) : "Unknown",
@@ -123,6 +121,8 @@ function parseGPData(data: any[], category: string): Satellite[] {
 
 export function getSatellitePosition(sat: Satellite, date: Date = new Date()) {
     const positionAndVelocity = satellite.propagate(sat.satrec, date);
+
+    // Explicit check to return early if data is missing
     if (!positionAndVelocity || !positionAndVelocity.position || !positionAndVelocity.velocity) {
         return {
             lat: 0, lng: 0, height: 0,
@@ -130,15 +130,17 @@ export function getSatellitePosition(sat: Satellite, date: Date = new Date()) {
             velocity: { x: 0, y: 0, z: 0 }
         };
     }
-    const positionGd = satellite.eciToGeodetic(positionAndVelocity.position as satellite.EciVec3<number>, satellite.gstime(date));
+
+    // Use non-null assertion (!) because we validated it in the if-block above
+    const positionEci = positionAndVelocity.position as satellite.EciVec3<number>;
+    const velocityEci = positionAndVelocity.velocity as satellite.EciVec3<number>;
+
+    const positionGd = satellite.eciToGeodetic(positionEci, satellite.gstime(date));
 
     // Convert to km
     const longitude = satellite.degreesLong(positionGd.longitude);
     const latitude = satellite.degreesLat(positionGd.latitude);
     const height = positionGd.height;
-
-    // Get ECI coordinates for 3D visualization (in km)
-    const positionEci = positionAndVelocity.position as { x: number, y: number, z: number };
 
     return {
         lat: latitude,
@@ -147,6 +149,6 @@ export function getSatellitePosition(sat: Satellite, date: Date = new Date()) {
         x: positionEci.x,
         y: positionEci.y,
         z: positionEci.z,
-        velocity: positionAndVelocity.velocity
+        velocity: velocityEci
     };
 }

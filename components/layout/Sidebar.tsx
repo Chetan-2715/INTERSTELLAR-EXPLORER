@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { LogOut, Rocket } from "lucide-react";
@@ -9,7 +9,12 @@ import { APP_ROUTES } from "@/lib/routes";
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter(); // Import useRouter
     const [isHovered, setIsHovered] = useState(false);
+
+    const handleLogout = () => {
+        router.push('/');
+    };
 
     return (
         <motion.div
@@ -43,8 +48,8 @@ export default function Sidebar() {
                     return (
                         <Link key={route.path} href={route.path}>
                             <div className={`flex items-center gap-4 p-3 rounded-xl transition-all group relative ${isActive
-                                    ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                                    : "text-white/60 hover:bg-white/5 hover:text-white"
+                                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                                : "text-white/60 hover:bg-white/5 hover:text-white"
                                 }`}>
                                 <Icon className={`w-6 h-6 shrink-0 ${isActive ? "animate-pulse" : ""}`} />
                                 <motion.span
@@ -68,7 +73,10 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-white/10">
-                <button className="flex items-center gap-4 p-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 transition-all group">
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-4 p-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 transition-all group"
+                >
                     <LogOut className="w-6 h-6 shrink-0" />
                     <motion.span
                         className="font-medium whitespace-nowrap"

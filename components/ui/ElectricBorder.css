@@ -1,0 +1,81 @@
+/* ElectricBorder.css */
+.electric-border {
+  --electric-light-color: #ffffff;
+  /* Fallback */
+  position: relative;
+  border-radius: inherit;
+  overflow: visible !important;
+  /* Force visible overflow */
+  isolation: isolate;
+  display: block;
+  /* Ensure it takes space */
+  width: 100%;
+  height: 100%;
+}
+
+.eb-canvas-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 20;
+  /* High z-index to sit on top of card */
+  overflow: visible;
+  width: auto;
+  height: auto;
+}
+
+.eb-canvas {
+  display: block;
+}
+
+.eb-content {
+  position: relative;
+  border-radius: inherit;
+  z-index: 10;
+  /* Content sits below canvas */
+  height: 100%;
+  /* Fill the wrapper */
+}
+
+.eb-layers {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 15;
+  /* Glows sit between content and canvas? Or below? Let's put below content for background glow, above for border glow? */
+  /* Actually, glows usually should be on top for 'electric' feel, but let's stick to base stacking */
+  z-index: 5;
+}
+
+.eb-glow-1,
+.eb-glow-2,
+.eb-background-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.eb-glow-1 {
+  border: 2px solid var(--electric-border-color);
+  opacity: 0.6;
+  filter: blur(1px);
+}
+
+.eb-glow-2 {
+  border: 2px solid var(--electric-border-color);
+  filter: blur(4px);
+  opacity: 0.8;
+}
+
+.eb-background-glow {
+  z-index: -1;
+  transform: scale(1.1);
+  filter: blur(32px);
+  opacity: 0.4;
+  background: radial-gradient(circle at center, var(--electric-border-color), transparent 70%);
+}
